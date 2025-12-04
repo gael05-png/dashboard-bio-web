@@ -19,6 +19,6 @@
 * **Visualización:** Altair, Matplotlib, Stmol
 * **APIs:** RCSB PDB REST API
 
-## 👨‍💻 Autor
+##  Autor
 
 Desarrollado por **Cristo Gael Lopezportillo Sánchez** como Proyecto Final de Bioinformática.
