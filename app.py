@@ -13,12 +13,11 @@ from stmol import showmol
 import py3Dmol
 import os
 
-# --- CONFIGURACIÓN VISUAL (Elegante & Profesional) ---
+# --- CONFIGURACIÓN VISUAL ---
 st.set_page_config(page_title="BioDashboard | C.G.L.S.", layout="wide", page_icon="🧬")
 
 st.markdown("""
 <style>
-    /* Estilos transparentes y limpios */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
@@ -66,13 +65,12 @@ with st.sidebar:
     surface = st.checkbox("Mostrar Superficie Volumétrica", value=False)
     
     st.divider()
-    st.markdown("### 👨‍💻 Desarrollado por:")
+    st.markdown("### Desarrollado por:")
     st.markdown("**Cristo Gael Lopezportillo Sánchez**")
     st.caption("Proyecto Final de Bioinformática")
 
 # --- FUNCIONES ---
 def get_pdb_info(pdb_id):
-    # Obtiene datos y TRADUCE al español
     try:
         url = f"https://data.rcsb.org/rest/v1/core/entry/{pdb_id}"
         response = requests.get(url)
@@ -112,7 +110,14 @@ def calculate_contact_map(structure):
             contact_map[i, j] = np.linalg.norm(atoms[i].coord - atoms[j].coord)
     return contact_map
 
+# Diccionarios de datos
 aa_props = {'A':'Hidrofóbico','V':'Hidrofóbico','L':'Hidrofóbico','I':'Hidrofóbico','M':'Hidrofóbico','F':'Hidrofóbico','W':'Hidrofóbico','P':'Hidrofóbico','G':'Polar','S':'Polar','T':'Polar','C':'Polar','Y':'Polar','N':'Polar','Q':'Polar','D':'Ácido','E':'Ácido','K':'Básico','R':'Básico','H':'Básico'}
+
+# Escala Kyte & Doolittle (Hardcoded para evitar errores de libreria)
+kd_scale = { 'A': 1.8,'R':-4.5,'N':-3.5,'D':-3.5,'C': 2.5,
+       'Q':-3.5,'E':-3.5,'G':-0.4,'H':-3.2,'I': 4.5,
+       'L': 3.8,'K':-3.9,'M': 1.9,'F': 2.8,'P':-1.6,
+       'S':-0.8,'T':-0.7,'W':-0.9,'Y':-1.3,'V': 4.2 }
 
 # --- LÓGICA PRINCIPAL ---
 if pdb_id:
@@ -152,7 +157,7 @@ if pdb_id:
                 st.markdown("### Detalles Estructurales")
                 st.write(f"**Longitud:** `{len(seq1_str)}` residuos")
                 
-                # Conteo de estructuras secundarias (estimado)
+                # Conteo de estructuras secundarias
                 header = struct1.header
                 if 'helix' in header:
                     st.write(f"**Hélices Alfa:** {len(header['helix'])}")
@@ -186,14 +191,25 @@ if pdb_id:
                  pie = alt.Chart(df_aa).mark_arc(innerRadius=60).encode(theta='Count', color='Tipo', tooltip=['Tipo', 'Count'])
                  st.altair_chart(pie, use_container_width=True)
 
-        # TAB 3: HIDROFOBICIDAD (NUEVO)
+        # TAB 3: HIDROFOBICIDAD (CORREGIDO)
         with t3:
             st.subheader("Perfil de Hidrofobicidad (Kyte & Doolittle)")
-            st.markdown("Gráfico que muestra regiones hidrofóbicas (valores positivos, interior de la proteína) e hidrofílicas (valores negativos, superficie).")
+            st.markdown("Gráfico que muestra regiones hidrofóbicas (valores positivos, interior) e hidrofílicas (valores negativos, superficie).")
             
-            # Calcular escala KD
-            kd_scale = analysed_seq.protein_scale(window=9, param_dict=analysed_seq.ProtParamData.kd)
-            df_kd = pd.DataFrame({'Posición': range(1, len(kd_scale)+1), 'Hidrofobicidad': kd_scale})
+            # Calcular escala KD usando el diccionario local
+            values = []
+            for aa in seq1_str:
+                if aa in kd_scale:
+                    values.append(kd_scale[aa])
+                else:
+                    values.append(0)
+            
+            # Suavizado (Media móvil simple de ventana 9)
+            window = 9
+            weights = np.repeat(1.0, window)/window
+            sma = np.convolve(values, weights, 'valid')
+            
+            df_kd = pd.DataFrame({'Posición': range(1, len(sma)+1), 'Hidrofobicidad': sma})
             
             chart_line = alt.Chart(df_kd).mark_line().encode(
                 x='Posición',
@@ -203,7 +219,6 @@ if pdb_id:
             ).properties(height=400).interactive()
             
             st.altair_chart(chart_line, use_container_width=True)
-            st.caption("Ventana de suavizado: 9 residuos.")
 
         # TAB 4: COMPARADOR
         with t4:
