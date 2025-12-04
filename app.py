@@ -66,7 +66,7 @@ with st.sidebar:
     surface = st.checkbox("Mostrar Superficie Volumétrica", value=False)
     
     st.divider()
-    st.markdown("### 👨‍💻 Desarrollado por:")
+    st.markdown("### Desarrollado por:")
     st.markdown("**Cristo Gael Lopezportillo Sánchez**")
     st.caption("Proyecto Final de Bioinformática | 2025")
     
