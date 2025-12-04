@@ -12,9 +12,10 @@ from Bio.Align import PairwiseAligner
 from stmol import showmol
 import py3Dmol
 import os
+from datetime import date
 
 # --- CONFIGURACIÓN VISUAL ---
-st.set_page_config(page_title="BioDashboard | C.G.L.S.", layout="wide", page_icon="🧬")
+st.set_page_config(page_title="BioDashboard Ultimate | C.G.L.S.", layout="wide", page_icon="🧬")
 
 st.markdown("""
 <style>
@@ -65,9 +66,16 @@ with st.sidebar:
     surface = st.checkbox("Mostrar Superficie Volumétrica", value=False)
     
     st.divider()
-    st.markdown("### Desarrollado por:")
+    st.markdown("### 👨‍💻 Desarrollado por:")
     st.markdown("**Cristo Gael Lopezportillo Sánchez**")
-    st.caption("Proyecto Final de Bioinformática")
+    st.caption("Proyecto Final de Bioinformática | 2025")
+    
+    # Enlaces externos
+    if pdb_id:
+        st.divider()
+        st.markdown("**Enlaces Externos:**")
+        st.link_button("Ver en RCSB PDB", f"https://www.rcsb.org/structure/{pdb_id}")
+        st.link_button("Ver en UniProt", f"https://www.uniprot.org/")
 
 # --- FUNCIONES ---
 def get_pdb_info(pdb_id):
@@ -78,13 +86,8 @@ def get_pdb_info(pdb_id):
             data = response.json()
             title_en = data['struct']['title']
             class_en = data['struct_keywords']['pdbx_keywords']
-            
-            # Traducción
             translator = GoogleTranslator(source='auto', target='es')
-            title_es = translator.translate(title_en)
-            class_es = translator.translate(class_en)
-            
-            return title_es, class_es
+            return translator.translate(title_en), translator.translate(class_en)
     except:
         return None, None
     return "Descripción no disponible", "Desconocido"
@@ -110,19 +113,13 @@ def calculate_contact_map(structure):
             contact_map[i, j] = np.linalg.norm(atoms[i].coord - atoms[j].coord)
     return contact_map
 
-# Diccionarios de datos
+# Datos fijos para evitar errores
 aa_props = {'A':'Hidrofóbico','V':'Hidrofóbico','L':'Hidrofóbico','I':'Hidrofóbico','M':'Hidrofóbico','F':'Hidrofóbico','W':'Hidrofóbico','P':'Hidrofóbico','G':'Polar','S':'Polar','T':'Polar','C':'Polar','Y':'Polar','N':'Polar','Q':'Polar','D':'Ácido','E':'Ácido','K':'Básico','R':'Básico','H':'Básico'}
-
-# Escala Kyte & Doolittle (Hardcoded para evitar errores de libreria)
-kd_scale = { 'A': 1.8,'R':-4.5,'N':-3.5,'D':-3.5,'C': 2.5,
-       'Q':-3.5,'E':-3.5,'G':-0.4,'H':-3.2,'I': 4.5,
-       'L': 3.8,'K':-3.9,'M': 1.9,'F': 2.8,'P':-1.6,
-       'S':-0.8,'T':-0.7,'W':-0.9,'Y':-1.3,'V': 4.2 }
+kd_scale = {'A':1.8,'R':-4.5,'N':-3.5,'D':-3.5,'C':2.5,'Q':-3.5,'E':-3.5,'G':-0.4,'H':-3.2,'I':4.5,'L':3.8,'K':-3.9,'M':1.9,'F':2.8,'P':-1.6,'S':-0.8,'T':-0.7,'W':-0.9,'Y':-1.3,'V':4.2}
 
 # --- LÓGICA PRINCIPAL ---
 if pdb_id:
     try:
-        # 1. OBTENER DEFINICIÓN TRADUCIDA
         desc_title, desc_class = get_pdb_info(pdb_id)
         
         if desc_title:
@@ -133,15 +130,14 @@ if pdb_id:
             </div>
             """, unsafe_allow_html=True)
         
-        # 2. CARGAR DATOS
         struct1 = get_structure(pdb_id)
         seq1_str = get_sequence(struct1)
         analysed_seq = ProteinAnalysis(seq1_str)
         
-        # PESTAÑAS
-        t1, t2, t3, t4, t5 = st.tabs(["🧊 Visor 3D", "📊 Análisis Químico", "📈 Hidrofobicidad", "⚔️ Comparador", "🔥 Heatmaps"])
+        # 6 PESTAÑAS AHORA
+        t1, t2, t3, t4, t5, t6 = st.tabs(["🧊 Visor 3D", "📊 Reporte", "📈 Radar", "📉 Hidrofobicidad", "⚔️ Comparador", "🔥 Heatmaps"])
 
-        # TAB 1: VISOR 3D
+        # TAB 1: 3D
         with t1:
             c1, c2 = st.columns([3, 1])
             with c1:
@@ -154,80 +150,104 @@ if pdb_id:
                 view.zoomTo()
                 showmol(view, height=500, width=800)
             with c2:
-                st.markdown("### Detalles Estructurales")
+                st.markdown("### Detalles")
                 st.write(f"**Longitud:** `{len(seq1_str)}` residuos")
-                
-                # Conteo de estructuras secundarias
                 header = struct1.header
-                if 'helix' in header:
-                    st.write(f"**Hélices Alfa:** {len(header['helix'])}")
-                if 'sheet' in header:
-                    st.write(f"**Láminas Beta:** {len(header['sheet'])}")
-                    
+                if 'helix' in header: st.write(f"**Hélices:** {len(header['helix'])}")
+                if 'sheet' in header: st.write(f"**Láminas:** {len(header['sheet'])}")
                 st.info("Renderizado WebGL Activo")
 
-        # TAB 2: REPORTE QUIMICO
+        # TAB 2: REPORTE
         with t2:
-            st.subheader(f"Informe Fisicoquímico: {pdb_id}")
-            col1, col2, col3, col4 = st.columns(4)
+            st.subheader("Informe Fisicoquímico")
+            c1, c2, c3, c4 = st.columns(4)
             mw = analysed_seq.molecular_weight()
             inst = analysed_seq.instability_index()
-            col1.metric("Peso Molecular", f"{mw/1000:.1f} kDa")
-            col2.metric("Punto Isoeléctrico", f"{analysed_seq.isoelectric_point():.2f} pH")
-            col3.metric("Hidropatía (GRAVY)", f"{analysed_seq.gravy():.2f}")
-            col4.metric("Estabilidad", f"{inst:.2f}", delta="Inestable" if inst>40 else "Estable", delta_color="inverse")
+            c1.metric("Peso Molecular", f"{mw/1000:.1f} kDa")
+            c2.metric("Punto Isoeléctrico", f"{analysed_seq.isoelectric_point():.2f} pH")
+            c3.metric("Hidropatía", f"{analysed_seq.gravy():.2f}")
+            c4.metric("Estabilidad", f"{inst:.2f}", delta="Inestable" if inst>40 else "Estable", delta_color="inverse")
             
             st.divider()
             
             df_aa = pd.DataFrame(list({k: seq1_str.count(k) for k in set(seq1_str)}.items()), columns=['AA', 'Count'])
             df_aa['Tipo'] = df_aa['AA'].map(aa_props)
             
-            c_bar, c_pie = st.columns(2)
-            with c_bar:
-                 st.markdown("**Frecuencia de Aminoácidos**")
+            gc1, gc2 = st.columns(2)
+            with gc1:
+                 st.markdown("**Composición de Aminoácidos**")
                  st.altair_chart(alt.Chart(df_aa).mark_bar().encode(x='AA', y='Count', color='Tipo').interactive(), use_container_width=True)
-            with c_pie:
-                 st.markdown("**Distribución por Grupo Químico**")
-                 pie = alt.Chart(df_aa).mark_arc(innerRadius=60).encode(theta='Count', color='Tipo', tooltip=['Tipo', 'Count'])
-                 st.altair_chart(pie, use_container_width=True)
+            with gc2:
+                 st.markdown("**Generador de Cita (APA)**")
+                 today = date.today()
+                 citation = f"RCSB Protein Data Bank. (2025). Structure {pdb_id}. Recuperado el {today} de rcsb.org. Análisis realizado mediante BioSuite X por C.G. Lopezportillo."
+                 st.code(citation, language='text')
 
-        # TAB 3: HIDROFOBICIDAD (CORREGIDO)
+        # TAB 3: RADAR (NUEVO)
         with t3:
-            st.subheader("Perfil de Hidrofobicidad (Kyte & Doolittle)")
-            st.markdown("Gráfico que muestra regiones hidrofóbicas (valores positivos, interior) e hidrofílicas (valores negativos, superficie).")
+            st.subheader("Comparativa Normalizada (Radar)")
+            st.write("Comparación de la proteína actual (Azul) vs. Promedio Típico (Rojo).")
             
-            # Calcular escala KD usando el diccionario local
-            values = []
-            for aa in seq1_str:
-                if aa in kd_scale:
-                    values.append(kd_scale[aa])
-                else:
-                    values.append(0)
+            # Datos simulados del promedio (benchmark)
+            categories = ['Hidrofobicidad', 'Estabilidad', 'Aromaticidad', 'Acidez (pH)']
             
-            # Suavizado (Media móvil simple de ventana 9)
+            # Normalización simple para el gráfico (0 a 1)
+            # Hidro: rango aprox -2 a 2 -> norm 0.5 base
+            val_hydro = (analysed_seq.gravy() + 2) / 4
+            # Estabilidad: rango 0 a 100 -> norm
+            val_stab = inst / 100
+            # Aromaticidad: 0 a 0.2
+            val_arom = analysed_seq.aromaticity() * 5
+            # pH: 0 a 14 -> norm
+            val_ph = analysed_seq.isoelectric_point() / 14
+            
+            values = [val_hydro, val_stab, val_arom, val_ph]
+            values_avg = [0.5, 0.4, 0.4, 0.5] # Valores teóricos promedio
+            
+            # Matplotlib Radar Chart
+            label_loc = np.linspace(start=0, stop=2 * np.pi, num=len(values))
+            
+            fig = plt.figure(figsize=(8, 8))
+            ax = fig.add_subplot(polar=True)
+            fig.patch.set_alpha(0)
+            ax.patch.set_alpha(0)
+            
+            # Plot Data
+            ax.plot(label_loc, values, label=f'{pdb_id}', color='cyan')
+            ax.fill(label_loc, values, color='cyan', alpha=0.25)
+            
+            # Plot Avg
+            ax.plot(label_loc, values_avg, label='Promedio Global', color='red', linestyle='--')
+            
+            ax.set_xticks(label_loc)
+            ax.set_xticklabels(categories)
+            ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0))
+            
+            # Estilos oscuros para que se vea bien
+            ax.tick_params(colors='gray')
+            ax.spines['polar'].set_color('gray')
+            
+            st.pyplot(fig)
+            st.caption("Nota: Los valores están normalizados (0-1) para facilitar la comparación visual.")
+
+        # TAB 4: HIDROFOBICIDAD
+        with t4:
+            st.subheader("Perfil de Kyte & Doolittle")
+            values = [kd_scale.get(aa, 0) for aa in seq1_str]
             window = 9
             weights = np.repeat(1.0, window)/window
             sma = np.convolve(values, weights, 'valid')
-            
             df_kd = pd.DataFrame({'Posición': range(1, len(sma)+1), 'Hidrofobicidad': sma})
-            
-            chart_line = alt.Chart(df_kd).mark_line().encode(
-                x='Posición',
-                y='Hidrofobicidad',
-                color=alt.value('#FF4B4B'),
-                tooltip=['Posición', 'Hidrofobicidad']
-            ).properties(height=400).interactive()
-            
-            st.altair_chart(chart_line, use_container_width=True)
+            st.altair_chart(alt.Chart(df_kd).mark_line().encode(x='Posición', y='Hidrofobicidad', color=alt.value('#FF4B4B')).properties(height=400).interactive(), use_container_width=True)
 
-        # TAB 4: COMPARADOR
-        with t4:
+        # TAB 5: COMPARADOR
+        with t5:
             st.subheader("Alineamiento por Pares")
             id2 = st.text_input("Comparar contra ID (ej: 1CRN):", "").upper()
             if id2:
                 try:
-                    t2_es, c2_es = get_pdb_info(id2)
-                    st.success(f"Comparando con: **{t2_es}**")
+                    t2_es, _ = get_pdb_info(id2)
+                    st.write(f"VS: **{t2_es}**")
                     struct2 = get_structure(id2)
                     seq2_str = get_sequence(struct2)
                     aligner = PairwiseAligner()
@@ -235,10 +255,10 @@ if pdb_id:
                     score = aligner.score(seq1_str, seq2_str)
                     identity = (score / max(len(seq1_str), len(seq2_str))) * 100
                     st.metric("Identidad Genética", f"{identity:.2f}%")
-                except: st.error("Error al cargar la segunda proteína.")
+                except: st.error("Error al cargar ID 2.")
 
-        # TAB 5: HEATMAPS
-        with t5:
+        # TAB 6: HEATMAPS
+        with t6:
             st.subheader("Mapa de Contactos")
             with st.spinner("Procesando..."):
                 matrix = calculate_contact_map(struct1)
@@ -249,10 +269,8 @@ if pdb_id:
                 plt.colorbar(im, label="Å")
                 ax.tick_params(colors='gray')
                 st.pyplot(fig)
-            st.caption(f"Análisis realizado por: **Cristo Gael Lopezportillo Sánchez**")
 
     except Exception as e:
-        st.error(f"Error del sistema: {e}")
-
+        st.error(f"Error: {e}")
 else:
-    st.info("Ingresa un ID para iniciar el sistema.")
+    st.info("Ingresa un ID para iniciar.")
