@@ -4,3 +4,5 @@ altair
 biopython
 py3Dmol
 stmol
+ipywidgets
+ipython_genutils
