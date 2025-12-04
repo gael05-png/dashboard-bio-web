@@ -36,7 +36,7 @@ with st.sidebar:
     color_3d = st.selectbox("Esquema de Color", ["spectrum", "chain", "residue", "secondary structure"])
     
     st.divider()
-    st.write("👨‍🔬 **Desarrollado por:*Cristo Gael Lopezportillo Sánchez*")
+    st.write("Desarrollado por: *Cristo Gael Lopezportillo Sánchez*")
     st.write("Equipo de Bioinformática 2024")
 
 # --- Funciones Científicas ---
