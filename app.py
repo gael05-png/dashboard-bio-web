@@ -31,7 +31,7 @@ st.markdown("""
         border-bottom: 2px solid #FF4B4B;
         font-weight: bold;
     }
-    /* Estilo para tarjetas de métricas sin fondo blanco duro */
+    /* Estilo para tarjetas de métricas */
     div[data-testid="stMetric"] {
         background-color: rgba(128, 128, 128, 0.05);
         border: 1px solid rgba(128, 128, 128, 0.1);
@@ -78,7 +78,7 @@ def calculate_contact_map(structure):
     contact_map = np.zeros((size, size))
     for i in range(size):
         for j in range(size):
-            contact_map[i, j] = atoms[i] - atoms[j]
+            contact_map[i, j] = np.linalg.norm(atoms[i].coord - atoms[j].coord)
     return contact_map
 
 # Mapeo de colores simple para gráficos
@@ -109,4 +109,88 @@ if pdb_id:
                 showmol(view, height=500, width=800)
             with col_info:
                 st.markdown("### Datos Estructurales")
-                st.
+                st.write(f"**ID:** {pdb_id}")
+                st.write(f"**Residuos:** {len(seq)}")
+                st.success("Renderizado WebGL: Activo")
+
+        # 2. REPORTE (Sin cuadros blancos feos)
+        with t2:
+            st.subheader(f"Informe Fisicoquímico: {pdb_id}")
+            
+            # Métricas en fila
+            c1, c2, c3, c4 = st.columns(4)
+            mw = analysed_seq.molecular_weight()
+            inst = analysed_seq.instability_index()
+            
+            c1.metric("Peso Molecular", f"{mw/1000:.1f} kDa")
+            c2.metric("Punto Isoeléctrico", f"{analysed_seq.isoelectric_point():.2f} pH")
+            c3.metric("Aromaticidad", f"{analysed_seq.aromaticity()*100:.1f}%")
+            c4.metric("Estabilidad", f"{inst:.2f}", delta="Inestable" if inst>40 else "Estable", delta_color="inverse")
+            
+            st.divider()
+            
+            # Gráficos integrados
+            g1, g2 = st.columns(2)
+            
+            aa_counts = {k: seq.count(k) for k in set(seq)}
+            df_aa = pd.DataFrame(list(aa_counts.items()), columns=['AA', 'Count'])
+            df_aa['Tipo'] = df_aa['AA'].map(aa_properties)
+            
+            with g1:
+                st.markdown("**Distribución de Aminoácidos**")
+                c = alt.Chart(df_aa).mark_bar().encode(
+                    x=alt.X('AA', sort='-y'), y='Count', color='Tipo', tooltip=['AA','Count','Tipo']
+                ).interactive()
+                st.altair_chart(c, use_container_width=True)
+                
+            with g2:
+                st.markdown("**Composición Química**")
+                base = alt.Chart(df_aa).encode(theta=alt.Theta("Count", stack=True))
+                pie = base.mark_arc(innerRadius=60).encode(
+                    color=alt.Color("Tipo"), order=alt.Order("Count", sort="descending"), tooltip=["Tipo", "Count"]
+                )
+                st.altair_chart(pie, use_container_width=True)
+
+            # Firma digital al pie del reporte
+            st.caption(f"Reporte generado automáticamente por el sistema BioSuite. Supervisado por: **Cristo Gael Lopezportillo Sánchez**.")
+
+        # 3. MAPA DE CONTACTOS
+        with t3:
+            st.subheader("Matriz de Distancias Euclidianas")
+            with st.spinner("Procesando geometría 3D..."):
+                dist_matrix = calculate_contact_map(structure)
+                fig, ax = plt.subplots(figsize=(8, 6))
+                # Fondo transparente para la gráfica
+                fig.patch.set_alpha(0)
+                ax.patch.set_alpha(0)
+                
+                im = ax.imshow(dist_matrix, cmap='magma_r', origin='lower')
+                plt.colorbar(im, label="Distancia (Å)")
+                
+                # Ajustar colores de ejes para modo oscuro/claro
+                ax.xaxis.label.set_color('gray')
+                ax.yaxis.label.set_color('gray')
+                ax.tick_params(axis='x', colors='gray')
+                ax.tick_params(axis='y', colors='gray')
+                
+                st.pyplot(fig)
+
+        # 4. SIMULACIÓN
+        with t4:
+            st.subheader("Laboratorio de Mutaciones")
+            cm1, cm2 = st.columns(2)
+            with cm1:
+                pos = st.number_input("Posición a mutar", 1, len(seq), 1)
+                new_aa = st.selectbox("Nuevo AA", list(aa_properties.keys()))
+                st.write(f"**{seq[pos-1]}{pos} ➝ {new_aa}**")
+            with cm2:
+                p_wt = ProteinAnalysis(seq)
+                p_mut = ProteinAnalysis(seq[:pos-1] + new_aa + seq[pos:])
+                delta = p_mut.molecular_weight() - p_wt.molecular_weight()
+                st.metric("Δ Peso Molecular", f"{delta:.2f} Da", delta=delta)
+
+    except Exception as e:
+        st.error(f"Hubo un error al procesar la proteína: {e}")
+
+else:
+    st.info("Esperando código PDB...")
