@@ -4,6 +4,7 @@ import numpy as np
 import altair as alt
 import matplotlib.pyplot as plt
 import requests
+from deep_translator import GoogleTranslator
 from Bio.PDB import PDBList, PDBParser, PPBuilder
 from Bio.SeqUtils import seq1
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
@@ -12,11 +13,12 @@ from stmol import showmol
 import py3Dmol
 import os
 
-# --- CONFIGURACIÓN VISUAL ---
+# --- CONFIGURACIÓN VISUAL (Elegante & Profesional) ---
 st.set_page_config(page_title="BioDashboard | C.G.L.S.", layout="wide", page_icon="🧬")
 
 st.markdown("""
 <style>
+    /* Estilos transparentes y limpios */
     .stTabs [data-baseweb="tab-list"] { gap: 8px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px;
@@ -48,37 +50,43 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ENCABEZADO ---
-st.title("🧬 BioSuite X: Plataforma Integral")
-st.markdown("**Análisis Estructural, Fisicoquímico y Comparativo de Proteínas**")
+st.title("🧬 BioSuite X: Análisis Bioinformático Integral")
+st.markdown("**Plataforma de visualización molecular, análisis fisicoquímico y alineamiento de secuencias.**")
 st.divider()
 
 # --- BARRA LATERAL ---
 with st.sidebar:
-    st.header('🎛️ Control Principal')
+    st.header('🎛️ Panel de Control')
     pdb_id = st.text_input("Buscar ID PDB:", "6LU7").upper()
     
     st.divider()
-    st.subheader("Configuración 3D")
+    st.subheader("Visualización 3D")
     style_3d = st.selectbox("Estilo", ["Cartoon", "Stick", "Sphere", "Line"])
     color_3d = st.selectbox("Color", ["spectrum", "chain", "secondary structure", "residue"])
-    surface = st.checkbox("Mostrar Superficie", value=False)
+    surface = st.checkbox("Mostrar Superficie Volumétrica", value=False)
     
     st.divider()
-    st.markdown("### 👨‍🔬 Lead Developer")
+    st.markdown("### 👨‍💻 Desarrollado por:")
     st.markdown("**Cristo Gael Lopezportillo Sánchez**")
-    st.caption("Bioinformática Avanzada | 2025")
+    st.caption("Proyecto Final de Bioinformática")
 
 # --- FUNCIONES ---
 def get_pdb_info(pdb_id):
-    # Conexión a la API del PDB para sacar la definición
+    # Obtiene datos y TRADUCE al español
     try:
         url = f"https://data.rcsb.org/rest/v1/core/entry/{pdb_id}"
         response = requests.get(url)
         if response.status_code == 200:
             data = response.json()
-            title = data['struct']['title']
-            classification = data['struct_keywords']['pdbx_keywords']
-            return title, classification
+            title_en = data['struct']['title']
+            class_en = data['struct_keywords']['pdbx_keywords']
+            
+            # Traducción
+            translator = GoogleTranslator(source='auto', target='es')
+            title_es = translator.translate(title_en)
+            class_es = translator.translate(class_en)
+            
+            return title_es, class_es
     except:
         return None, None
     return "Descripción no disponible", "Desconocido"
@@ -109,13 +117,13 @@ aa_props = {'A':'Hidrofóbico','V':'Hidrofóbico','L':'Hidrofóbico','I':'Hidrof
 # --- LÓGICA PRINCIPAL ---
 if pdb_id:
     try:
-        # 1. OBTENER DEFINICIÓN (NUEVO)
+        # 1. OBTENER DEFINICIÓN TRADUCIDA
         desc_title, desc_class = get_pdb_info(pdb_id)
         
         if desc_title:
             st.markdown(f"""
             <div class="definition-box">
-                <h3 style="margin:0; color:#FF4B4B;">{pdb_id} | {desc_class}</h3>
+                <h3 style="margin:0; color:#FF4B4B;">{pdb_id} | {desc_class.upper() if desc_class else 'SIN CLASE'}</h3>
                 <p style="font-size:18px; margin-top:5px;"><strong>Definición:</strong> {desc_title.capitalize()}</p>
             </div>
             """, unsafe_allow_html=True)
@@ -126,9 +134,9 @@ if pdb_id:
         analysed_seq = ProteinAnalysis(seq1_str)
         
         # PESTAÑAS
-        t1, t2, t3, t4, t5 = st.tabs(["🧊 Visor 3D", "📊 Reporte", "⚔️ Comparador", "🔥 Heatmaps", "⚗️ Laboratorio"])
+        t1, t2, t3, t4, t5 = st.tabs(["🧊 Visor 3D", "📊 Análisis Químico", "📈 Hidrofobicidad", "⚔️ Comparador", "🔥 Heatmaps"])
 
-        # VISOR 3D
+        # TAB 1: VISOR 3D
         with t1:
             c1, c2 = st.columns([3, 1])
             with c1:
@@ -141,12 +149,19 @@ if pdb_id:
                 view.zoomTo()
                 showmol(view, height=500, width=800)
             with c2:
-                st.markdown("### Detalles Técnicos")
+                st.markdown("### Detalles Estructurales")
                 st.write(f"**Longitud:** `{len(seq1_str)}` residuos")
-                st.write(f"**Clasificación:** `{desc_class}`")
+                
+                # Conteo de estructuras secundarias (estimado)
+                header = struct1.header
+                if 'helix' in header:
+                    st.write(f"**Hélices Alfa:** {len(header['helix'])}")
+                if 'sheet' in header:
+                    st.write(f"**Láminas Beta:** {len(header['sheet'])}")
+                    
                 st.info("Renderizado WebGL Activo")
 
-        # REPORTE
+        # TAB 2: REPORTE QUIMICO
         with t2:
             st.subheader(f"Informe Fisicoquímico: {pdb_id}")
             col1, col2, col3, col4 = st.columns(4)
@@ -154,27 +169,50 @@ if pdb_id:
             inst = analysed_seq.instability_index()
             col1.metric("Peso Molecular", f"{mw/1000:.1f} kDa")
             col2.metric("Punto Isoeléctrico", f"{analysed_seq.isoelectric_point():.2f} pH")
-            col3.metric("Hidropatía", f"{analysed_seq.gravy():.2f}")
+            col3.metric("Hidropatía (GRAVY)", f"{analysed_seq.gravy():.2f}")
             col4.metric("Estabilidad", f"{inst:.2f}", delta="Inestable" if inst>40 else "Estable", delta_color="inverse")
             
             st.divider()
-            st.markdown(f"**Conclusión Automática:** La estructura identificada como *{desc_title}* presenta un perfil {'ácido' if analysed_seq.isoelectric_point() < 7 else 'básico'} y se clasifica como {desc_class}.")
             
             df_aa = pd.DataFrame(list({k: seq1_str.count(k) for k in set(seq1_str)}.items()), columns=['AA', 'Count'])
             df_aa['Tipo'] = df_aa['AA'].map(aa_props)
-            base = alt.Chart(df_aa).encode(theta=alt.Theta("Count", stack=True))
-            pie = base.mark_arc(innerRadius=70).encode(color=alt.Color("Tipo"), order=alt.Order("Count", sort="descending"), tooltip=["Tipo", "Count"])
-            st.altair_chart(pie, use_container_width=True)
-            st.caption(f"Autor: **Cristo Gael Lopezportillo Sánchez**")
+            
+            c_bar, c_pie = st.columns(2)
+            with c_bar:
+                 st.markdown("**Frecuencia de Aminoácidos**")
+                 st.altair_chart(alt.Chart(df_aa).mark_bar().encode(x='AA', y='Count', color='Tipo').interactive(), use_container_width=True)
+            with c_pie:
+                 st.markdown("**Distribución por Grupo Químico**")
+                 pie = alt.Chart(df_aa).mark_arc(innerRadius=60).encode(theta='Count', color='Tipo', tooltip=['Tipo', 'Count'])
+                 st.altair_chart(pie, use_container_width=True)
 
-        # COMPARADOR
+        # TAB 3: HIDROFOBICIDAD (NUEVO)
         with t3:
+            st.subheader("Perfil de Hidrofobicidad (Kyte & Doolittle)")
+            st.markdown("Gráfico que muestra regiones hidrofóbicas (valores positivos, interior de la proteína) e hidrofílicas (valores negativos, superficie).")
+            
+            # Calcular escala KD
+            kd_scale = analysed_seq.protein_scale(window=9, param_dict=analysed_seq.ProtParamData.kd)
+            df_kd = pd.DataFrame({'Posición': range(1, len(kd_scale)+1), 'Hidrofobicidad': kd_scale})
+            
+            chart_line = alt.Chart(df_kd).mark_line().encode(
+                x='Posición',
+                y='Hidrofobicidad',
+                color=alt.value('#FF4B4B'),
+                tooltip=['Posición', 'Hidrofobicidad']
+            ).properties(height=400).interactive()
+            
+            st.altair_chart(chart_line, use_container_width=True)
+            st.caption("Ventana de suavizado: 9 residuos.")
+
+        # TAB 4: COMPARADOR
+        with t4:
             st.subheader("Alineamiento por Pares")
-            id2 = st.text_input("Comparar contra ID:", "").upper()
+            id2 = st.text_input("Comparar contra ID (ej: 1CRN):", "").upper()
             if id2:
                 try:
-                    title2, class2 = get_pdb_info(id2) # Obtener nombre de la segunda también
-                    st.write(f"Comparando con: **{title2}**")
+                    t2_es, c2_es = get_pdb_info(id2)
+                    st.success(f"Comparando con: **{t2_es}**")
                     struct2 = get_structure(id2)
                     seq2_str = get_sequence(struct2)
                     aligner = PairwiseAligner()
@@ -182,38 +220,24 @@ if pdb_id:
                     score = aligner.score(seq1_str, seq2_str)
                     identity = (score / max(len(seq1_str), len(seq2_str))) * 100
                     st.metric("Identidad Genética", f"{identity:.2f}%")
-                    st.code(f"A ({pdb_id}): {seq1_str[:50]}...\nB ({id2}): {seq2_str[:50]}...")
                 except: st.error("Error al cargar la segunda proteína.")
 
-        # HEATMAPS
-        with t4:
+        # TAB 5: HEATMAPS
+        with t5:
             st.subheader("Mapa de Contactos")
             with st.spinner("Procesando..."):
                 matrix = calculate_contact_map(struct1)
                 fig, ax = plt.subplots()
                 fig.patch.set_alpha(0)
                 ax.patch.set_alpha(0)
-                im = ax.imshow(matrix, cmap='plasma', origin='lower')
+                im = ax.imshow(matrix, cmap='viridis', origin='lower')
                 plt.colorbar(im, label="Å")
                 ax.tick_params(colors='gray')
                 st.pyplot(fig)
-
-        # SIMULACIÓN
-        with t5:
-            st.subheader("Mutagénesis")
-            c1, c2 = st.columns(2)
-            with c1:
-                pos = st.number_input("Residuo", 1, len(seq1_str), 1)
-                new = st.selectbox("Cambio", list(aa_props.keys()))
-                st.write(f"**{seq1_str[pos-1]}{pos} ➝ {new}**")
-            with c2:
-                p_wt = ProteinAnalysis(seq1_str)
-                p_mut = ProteinAnalysis(seq1_str[:pos-1] + new + seq1_str[pos:])
-                d_mw = p_mut.molecular_weight() - p_wt.molecular_weight()
-                st.metric("Δ Peso", f"{d_mw:.2f} Da", delta=d_mw)
+            st.caption(f"Análisis realizado por: **Cristo Gael Lopezportillo Sánchez**")
 
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error del sistema: {e}")
 
 else:
     st.info("Ingresa un ID para iniciar el sistema.")
