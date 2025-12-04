@@ -8,3 +8,4 @@ ipywidgets
 ipython_genutils
 matplotlib
 numpy
+requests
