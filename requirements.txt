@@ -6,3 +6,5 @@ py3Dmol
 stmol
 ipywidgets
 ipython_genutils
+matplotlib
+numpy
