@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import altair as alt
-import matplotlib.pyplot as plt
 from Bio.PDB import PDBList, PDBParser, PPBuilder
 from Bio.SeqUtils import seq1
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
@@ -10,36 +9,40 @@ from stmol import showmol
 import py3Dmol
 import os
 
-# --- Configuración Avanzada ---
+# --- Configuración Visual ---
 st.set_page_config(page_title="BioSuite Ultimate", layout="wide", page_icon="🧬")
 
-# Estilos CSS para que se vea profesional
 st.markdown("""
 <style>
-    .big-font { font-size:20px !important; font-weight: bold; }
-    .metric-container { background-color: #f0f2f6; padding: 10px; border-radius: 10px; }
+    .metric-card {
+        background-color: #f0f2f6;
+        border-left: 5px solid #4B4B4B;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+    h3 { color: #2c3e50; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("🧬 BioSuite: Análisis Estructural y Mutagénesis")
-st.markdown("Plataforma avanzada para visualización molecular, validación geométrica y simulación de mutaciones.")
+st.markdown("**Proyecto Final de Bioinformática** | Análisis de estructuras PDB en tiempo real.")
 st.divider()
 
 # --- Barra Lateral ---
 with st.sidebar:
-    st.header('🎛️ Centro de Control')
+    st.header('🎛️ Configuración')
     pdb_id = st.text_input("ID PDB:", "1A2C").upper()
     
     st.divider()
-    st.subheader("⚙️ Configuración 3D")
-    style_3d = st.selectbox("Estilo de Visualización", ["Cartoon", "Stick", "Sphere", "Line"])
-    color_3d = st.selectbox("Esquema de Color", ["spectrum", "chain", "residue", "secondary structure"])
+    st.subheader("Visualización 3D")
+    style_3d = st.selectbox("Estilo", ["Cartoon", "Stick", "Sphere", "Line"])
+    color_3d = st.selectbox("Color", ["spectrum", "chain", "secondary structure", "residue"])
     
     st.divider()
-    st.write("Desarrollado por: *Cristo Gael Lopezportillo Sánchez*")
-    st.write("Equipo de Bioinformática 2024")
+    st.info("Desarrollado por el Equipo BioInfo 2025")
 
-# --- Funciones Científicas ---
+# --- Funciones ---
 def get_structure_data(id_pdb):
     if not os.path.exists('pdb'): os.makedirs('pdb')
     pdbl = PDBList(verbose=False)
@@ -48,7 +51,6 @@ def get_structure_data(id_pdb):
     return parser.get_structure(id_pdb, file)
 
 def calculate_ramachandran(structure):
-    # Calcula ángulos Phi y Psi para validación geométrica
     phi_psi = []
     ppb = PPBuilder()
     for pp in ppb.build_peptides(structure):
@@ -57,125 +59,140 @@ def calculate_ramachandran(structure):
                 phi_psi.append([phi, psi])
     return np.array(phi_psi)
 
+# Diccionario de propiedades químicas
+aa_properties = {
+    'A': 'Hidrofóbico', 'V': 'Hidrofóbico', 'L': 'Hidrofóbico', 'I': 'Hidrofóbico', 
+    'M': 'Hidrofóbico', 'F': 'Hidrofóbico', 'W': 'Hidrofóbico', 'P': 'Hidrofóbico',
+    'G': 'Polar', 'S': 'Polar', 'T': 'Polar', 'C': 'Polar', 'Y': 'Polar', 'N': 'Polar', 'Q': 'Polar',
+    'D': 'Ácido (-)', 'E': 'Ácido (-)',
+    'K': 'Básico (+)', 'R': 'Básico (+)', 'H': 'Básico (+)'
+}
+
 # --- Lógica Principal ---
 if pdb_id:
     try:
-        # Carga de datos
         structure = get_structure_data(pdb_id)
-        
-        # Obtener secuencia limpia
         residues = [r for m in structure for c in m for r in c if r.get_id()[0]==' ']
         seq = "".join([seq1(r.get_resname()) for r in residues if seq1(r.get_resname()) != 'X'])
-        
-        # Objeto de Análisis
         analysed_seq = ProteinAnalysis(seq)
         
-        # --- PESTAÑAS PRINCIPALES ---
-        tab1, tab2, tab3, tab4 = st.tabs(["🧊 Visor 3D", "📐 Validación (Ramachandran)", "⚗️ Laboratorio de Mutaciones", "📊 Reporte General"])
+        # Tabs
+        tab1, tab2, tab3, tab4 = st.tabs(["🧊 Visor 3D", "📐 Ramachandran", "⚗️ Mutaciones", "📊 Reporte Ejecutivo"])
 
-        # 1. VISOR 3D MEJORADO
+        # TAB 1: 3D
         with tab1:
             c1, c2 = st.columns([3, 1])
             with c1:
                 view = py3Dmol.view(query='pdb:'+pdb_id)
-                # Aplicar estilos dinámicos
                 if style_3d == "Cartoon": view.setStyle({'cartoon':{'color':color_3d}})
                 elif style_3d == "Stick": view.setStyle({'stick':{'color':color_3d}})
                 elif style_3d == "Sphere": view.setStyle({'sphere':{'color':color_3d}})
                 elif style_3d == "Line": view.setStyle({'line':{'color':color_3d}})
-                
                 view.zoomTo()
-                showmol(view, height=500, width=800)
+                showmol(view, height=450, width=700)
             with c2:
-                st.info(f"Visualizando: **{pdb_id}**")
-                st.write(f"Residuos totales: {len(seq)}")
-                st.write("Usa el menú lateral para cambiar el estilo de renderizado.")
+                st.markdown(f"**Detalles:**")
+                st.write(f"ID: `{pdb_id}`")
+                st.write(f"Longitud: `{len(seq)} resid`")
 
-        # 2. GRÁFICO DE RAMACHANDRAN (Nivel Experto)
+        # TAB 2: Ramachandran
         with tab2:
-            st.subheader("Validación Geométrica: Gráfico de Ramachandran")
-            st.markdown("Este gráfico muestra los ángulos de torsión (Phi vs Psi) del esqueleto proteico. Las regiones densas indican estructuras secundarias estables (Hélices Alfa / Láminas Beta).")
-            
+            st.subheader("Validación Geométrica")
             angles = calculate_ramachandran(structure)
             if len(angles) > 0:
-                # Convertir radianes a grados
                 angles = angles * 180 / np.pi
                 df_rama = pd.DataFrame(angles, columns=['Phi', 'Psi'])
-                
-                # Gráfico con Altair
                 chart = alt.Chart(df_rama).mark_circle(size=60, opacity=0.5).encode(
-                    x=alt.X('Phi', title='Phi (φ) Grados', scale=alt.Scale(domain=[-180, 180])),
-                    y=alt.Y('Psi', title='Psi (ψ) Grados', scale=alt.Scale(domain=[-180, 180])),
-                    tooltip=['Phi', 'Psi'],
-                    color=alt.value('purple')
-                ).properties(
-                    width=600, height=400, title=f"Distribución Conformacional de {pdb_id}"
-                ).interactive()
-                
+                    x=alt.X('Phi', scale=alt.Scale(domain=[-180, 180])),
+                    y=alt.Y('Psi', scale=alt.Scale(domain=[-180, 180])),
+                    color=alt.value('#6c5ce7'),
+                    tooltip=['Phi', 'Psi']
+                ).properties(height=400).interactive()
                 st.altair_chart(chart, use_container_width=True)
-            else:
-                st.warning("No se pudieron calcular los ángulos para esta estructura.")
 
-        # 3. LABORATORIO DE MUTACIONES (Interactivo)
+        # TAB 3: Mutaciones
         with tab3:
-            st.subheader("🧬 Simulador de Mutagénesis Dirigida")
-            st.write("Modifica un residuo de la secuencia y observa el impacto en las propiedades fisicoquímicas.")
-            
-            col_mut1, col_mut2 = st.columns(2)
-            
-            # Selector de mutación
-            with col_mut1:
-                st.code(seq[:50] + "...", language="text")
-                pos = st.number_input("Posición a mutar (1 - " + str(len(seq)) + ")", min_value=1, max_value=len(seq), value=1)
-                new_aa = st.selectbox("Nuevo Aminoácido", ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y'])
-                
-                # Crear secuencia mutada
-                original_aa = seq[pos-1]
-                mutated_seq = seq[:pos-1] + new_aa + seq[pos:]
-                
-                st.write(f"Cambio: **{original_aa}{pos}{new_aa}**")
+            st.subheader("Simulador de Mutagénesis")
+            c_input, c_result = st.columns(2)
+            with c_input:
+                pos = st.number_input("Posición", 1, len(seq), 1)
+                new_aa = st.selectbox("Nuevo Aminoácido", list(aa_properties.keys()))
+                orig = seq[pos-1]
+                st.write(f"Mutación: **{orig}{pos}{new_aa}**")
+            with c_result:
+                mut_seq = seq[:pos-1] + new_aa + seq[pos:]
+                p_wt = ProteinAnalysis(seq)
+                p_mut = ProteinAnalysis(mut_seq)
+                d_mw = p_mut.molecular_weight() - p_wt.molecular_weight()
+                st.metric("Cambio Peso Molecular", f"{d_mw:.2f} Da", delta=d_mw)
 
-            # Comparación de resultados
-            with col_mut2:
-                # Análisis
-                p_wt = ProteinAnalysis(seq) # Wild Type
-                p_mut = ProteinAnalysis(mutated_seq) # Mutante
-                
-                # Métricas
-                delta_mw = p_mut.molecular_weight() - p_wt.molecular_weight()
-                delta_pi = p_mut.isoelectric_point() - p_wt.isoelectric_point()
-                
-                st.metric("Δ Peso Molecular", f"{delta_mw:.2f} Da", delta_color="inverse")
-                st.metric("Δ Punto Isoeléctrico", f"{delta_pi:.2f} pH", delta_color="normal")
-                
-                if abs(delta_mw) > 50:
-                    st.warning("⚠️ Cambio significativo en masa detectado.")
-                else:
-                    st.success("✅ Cambio estructural leve.")
-
-        # 4. REPORTE GENERAL
+        # TAB 4: REPORTE MEJORADO (Aquí está el cambio grande)
         with tab4:
-            st.subheader("Resumen Estadístico")
-            # Conteo de aminoácidos
-            aa_count = {k: seq.count(k) for k in set(seq)}
-            df_aa = pd.DataFrame(list(aa_count.items()), columns=['AA', 'Count'])
+            st.subheader(f"Informe Fisicoquímico: {pdb_id}")
             
-            # Gráfico de pastel
-            fig, ax = plt.subplots()
-            ax.pie(df_aa['Count'], labels=df_aa['AA'], autopct='%1.1f%%', startangle=90)
-            ax.axis('equal') 
-            st.pyplot(fig)
+            # 1. Tarjetas de Métricas (Fila Superior)
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             
-            st.write("**Clasificación de Estabilidad:**")
+            mw = analysed_seq.molecular_weight()
+            pi = analysed_seq.isoelectric_point()
             instability = analysed_seq.instability_index()
+            aromatic = analysed_seq.aromaticity()
+            
+            col_m1.metric("Peso Molecular", f"{mw/1000:.1f} kDa")
+            col_m2.metric("Punto Isoeléctrico", f"{pi:.2f} pH")
+            col_m3.metric("Aromaticidad", f"{aromatic*100:.1f}%")
+            
+            # Lógica de color para inestabilidad
             if instability > 40:
-                st.error(f"Inestable (Índice: {instability:.2f})")
+                col_m4.metric("Estabilidad", "Inestable", f"{instability:.2f}", delta_color="inverse")
             else:
-                st.success(f"Estable (Índice: {instability:.2f})")
+                col_m4.metric("Estabilidad", "Estable", f"{instability:.2f}")
+
+            st.divider()
+
+            # 2. Gráficos Organizados (Dos columnas)
+            g_col1, g_col2 = st.columns(2)
+
+            # Preparar datos
+            aa_counts = {k: seq.count(k) for k in set(seq)}
+            df_aa = pd.DataFrame(list(aa_counts.items()), columns=['AA', 'Count'])
+            
+            # Agregar grupo químico al DataFrame
+            df_aa['Grupo'] = df_aa['AA'].map(aa_properties)
+            
+            with g_col1:
+                st.markdown("#### Distribución de Aminoácidos")
+                # Gráfico de Barras ordenado
+                bar_chart = alt.Chart(df_aa).mark_bar().encode(
+                    x=alt.X('AA', sort='-y', title='Aminoácido'),
+                    y=alt.Y('Count', title='Frecuencia'),
+                    color='Grupo',
+                    tooltip=['AA', 'Count', 'Grupo']
+                ).interactive()
+                st.altair_chart(bar_chart, use_container_width=True)
+
+            with g_col2:
+                st.markdown("#### Composición Química")
+                # Agrupar por propiedades
+                df_props = df_aa.groupby('Grupo').sum(numeric_only=True).reset_index()
+                
+                # Gráfico de Donas (Donut Chart)
+                base = alt.Chart(df_props).encode(theta=alt.Theta("Count", stack=True))
+                pie = base.mark_arc(outerRadius=120, innerRadius=80).encode(
+                    color=alt.Color("Grupo"),
+                    order=alt.Order("Count", sort="descending"),
+                    tooltip=["Grupo", "Count"]
+                )
+                text = base.mark_text(radius=140).encode(
+                    text="Count",
+                    order=alt.Order("Count", sort="descending"),
+                    color=alt.value("black") 
+                )
+                st.altair_chart(pie + text, use_container_width=True)
+            
+            # 3. Expander para datos crudos
+            with st.expander("Ver secuencia completa FASTA"):
+                st.code(f">{pdb_id}\n{seq}")
 
     except Exception as e:
-        st.error(f"Error procesando la proteína: {e}")
-        st.info("Intenta con otro ID (ej: 6LU7, 4HHB)")
-
-else:
-    st.info("Por favor ingresa un ID de PDB en el menú lateral.")
+        st.error(f"Error: {e}")
