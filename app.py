@@ -14,7 +14,7 @@ st.markdown("Entrega de Proyecto Final - Bioinformática")
 
 # Sidebar
 pdb_id = st.sidebar.text_input("ID PDB:", "6LU7").upper()
-st.sidebar.write("Equipo: [Tu Nombre] y [Compañero]")
+st.sidebar.write("Equipo: [Cristo Gael Lopezportillo Sánchez]")
 
 # Funciones
 def get_seq(structure):
